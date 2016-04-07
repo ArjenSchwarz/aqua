@@ -21,7 +21,9 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -39,11 +41,14 @@ import (
 )
 
 var (
-	functionName string
-	roleName     string
-	region       string
-	httpMethod   string
-	filePath     string
+	functionName   string
+	roleName       string
+	region         string
+	filePath       string
+	authentication string
+	jsonOutput     bool
+	apikeyRequired bool
+	httpMethod     = "POST"
 )
 
 var helloworld64 = "UEsDBBQAAAAIAFqghkjgANcUYwAAAG4AAAAIABwAaW5kZXguanNVVAkAA8veBFfN3gRXdXgLAAEE9QEAAAQUAAAALYxBCsJAEATveUWTU4KyDzDkITnG3dYIZkZ2ZiVB/HsWsW4FRXF7aXYLyyzpyYwRtyLRHyod3xQ/I6o4N+/xaVD5a7ASI5m6dtICqyV8oRFzvpe1ql1anPB7hKumvR+a73AAUEsBAh4DFAAAAAgAWqCGSOAA1xRjAAAAbgAAAAgAGAAAAAAAAQAAAKSBAAAAAGluZGV4LmpzVVQFAAPL3gRXdXgLAAEE9QEAAAQUAAAAUEsFBgAAAAABAAEATgAAAKUAAAAAAA=="
@@ -55,6 +60,8 @@ var RootCmd = &cobra.Command{
 	Long: `Running aqua will create a gateway for the provided function.
 If the function doesn't exist yet, it will first create it using the provided
 file or a basic example that echoes back your parameters.
+
+Currently the runtime for the Lambda function is limited to NodeJS.
 `,
 	Run: buildGateway,
 }
@@ -70,8 +77,10 @@ func init() {
 	RootCmd.Flags().StringVarP(&functionName, "name", "n", "", "The name of the Lambda function")
 	RootCmd.Flags().StringVarP(&roleName, "role", "r", "-", "The name of the Role for the lambda function. (Required when making a new Lambda function)")
 	RootCmd.Flags().StringVar(&region, "region", "us-east-1", "The region for the lambda function and API Gateway")
-	RootCmd.Flags().StringVarP(&httpMethod, "method", "m", "POST", "The HTTP method for the created endpoint API Gateway")
+	RootCmd.Flags().StringVarP(&authentication, "authentication", "a", "NONE", "The Authentication method to be used")
 	RootCmd.Flags().StringVarP(&filePath, "file", "f", "helloworld", "The zip file for your Lambda function")
+	RootCmd.Flags().BoolVarP(&apikeyRequired, "apikey", "k", false, "Endpoint can only be accessed with an API key")
+	RootCmd.Flags().BoolVar(&jsonOutput, "json", false, "Set to true to print output in JSON format")
 }
 
 func buildGateway(cmd *cobra.Command, args []string) {
@@ -79,35 +88,46 @@ func buildGateway(cmd *cobra.Command, args []string) {
 	err := builder.ensureLambdaFunction()
 
 	if err != nil {
-		fmt.Println(err.Error())
+		printFailure(err.Error())
 		return
 	}
 
 	err = builder.createApiGateway()
 
 	if err != nil {
-		fmt.Println(err.Error())
+		printFailure(err.Error())
 		return
 	}
 
-	builder.addResources()
-	err = builder.configureResources()
+	err = builder.addResources()
 	if err != nil {
-		fmt.Println(err.Error())
+		printFailure(err.Error())
 		return
 	}
+
+	err = builder.configureResources()
+	if err != nil {
+		printFailure(err.Error())
+		return
+	}
+
 	err = builder.deployAPI()
 	if err != nil {
-		fmt.Println(err.Error())
+		printFailure(err.Error())
 		return
 	}
 
 	err = builder.addPermissions()
 	if err != nil {
-		fmt.Println(err.Error())
+		printFailure(err.Error())
 		return
 	}
-	fmt.Printf("Your endpoint is available at %s", builder.Endpoint())
+
+	msg := fmt.Sprintf("Your endpoint is available at %s", builder.Endpoint())
+	if apikeyRequired {
+		msg += "\nRemember to configure your API keys before you can use"
+	}
+	printSuccess(msg)
 }
 
 type Builder struct {
@@ -183,7 +203,7 @@ func (builder *Builder) createLambdaFunction(svc *lambda.Lambda) error {
 		FunctionName: aws.String(functionName),
 		Handler:      aws.String("index.handler"),
 		Role:         role.Role.Arn,
-		Runtime:      aws.String("nodejs"),
+		Runtime:      aws.String("nodejs4.3"),
 	}
 	newLambda, err := svc.CreateFunction(params)
 
@@ -223,7 +243,6 @@ func (builder *Builder) addResources() error {
 	resp, err := svc.GetResources(params)
 
 	if err != nil {
-		fmt.Println(err.Error())
 		return err
 	}
 
@@ -239,18 +258,9 @@ func (builder *Builder) addResources() error {
 	if err != nil {
 		return err
 	}
-	builder.Resource = resource
-	methodParams := &apigateway.PutMethodInput{
-		AuthorizationType: aws.String("NONE"),     // Required
-		HttpMethod:        aws.String(httpMethod), // Required
-		ResourceId:        builder.Resource.Id,    // Required
-		RestApiId:         builder.ApiGateway.Id,  // Required
-	}
-	_, err = svc.PutMethod(methodParams)
 
-	if err != nil {
-		return err
-	}
+	builder.Resource = resource
+
 	return nil
 }
 
@@ -259,28 +269,41 @@ func (builder *Builder) configureResources() error {
 
 	uriString := fmt.Sprintf("arn:aws:apigateway:%s:lambda:path/2015-03-31/functions/%s/invocations", region, aws.StringValue(builder.Lambda.FunctionArn))
 
+	methodParams := &apigateway.PutMethodInput{
+		AuthorizationType: aws.String(authentication),
+		HttpMethod:        aws.String(httpMethod),
+		ResourceId:        builder.Resource.Id,
+		RestApiId:         builder.ApiGateway.Id,
+		ApiKeyRequired:    aws.Bool(apikeyRequired),
+	}
+	_, err := svc.PutMethod(methodParams)
+
+	if err != nil {
+		return err
+	}
+
 	params := &apigateway.PutIntegrationInput{
-		HttpMethod: aws.String(httpMethod), // Required
-		ResourceId: builder.Resource.Id,    // Required
-		RestApiId:  builder.ApiGateway.Id,  // Required
-		Type:       aws.String("AWS"),      // Required
+		HttpMethod: aws.String(httpMethod),
+		ResourceId: builder.Resource.Id,
+		RestApiId:  builder.ApiGateway.Id,
+		Type:       aws.String("AWS"),
 		IntegrationHttpMethod: aws.String(httpMethod),
 		RequestTemplates: map[string]*string{
-			"application/x-www-form-urlencoded": aws.String(`{"body": $input.json("$")}`), // Required
+			"application/x-www-form-urlencoded": aws.String(`{"body": $input.json("$")}`),
 		},
 		Uri: aws.String(uriString),
 	}
-	_, err := svc.PutIntegration(params)
+	_, err = svc.PutIntegration(params)
 
 	if err != nil {
 		return err
 	}
 
 	integrationResponseParams := &apigateway.PutIntegrationResponseInput{
-		HttpMethod:       aws.String(httpMethod), // Required
-		ResourceId:       builder.Resource.Id,    // Required
-		RestApiId:        builder.ApiGateway.Id,  // Required
-		StatusCode:       aws.String("200"),      // Required
+		HttpMethod:       aws.String(httpMethod),
+		ResourceId:       builder.Resource.Id,
+		RestApiId:        builder.ApiGateway.Id,
+		StatusCode:       aws.String("200"),
 		SelectionPattern: aws.String(".*"),
 	}
 	_, err = svc.PutIntegrationResponse(integrationResponseParams)
@@ -290,10 +313,10 @@ func (builder *Builder) configureResources() error {
 	}
 
 	methodResponsParams := &apigateway.PutMethodResponseInput{
-		HttpMethod:     aws.String(httpMethod), // Required
-		ResourceId:     builder.Resource.Id,    // Required
-		RestApiId:      builder.ApiGateway.Id,  // Required
-		StatusCode:     aws.String("200"),      // Required
+		HttpMethod:     aws.String(httpMethod),
+		ResourceId:     builder.Resource.Id,
+		RestApiId:      builder.ApiGateway.Id,
+		StatusCode:     aws.String("200"),
 		ResponseModels: map[string]*string{},
 	}
 	_, err = svc.PutMethodResponse(methodResponsParams)
@@ -305,8 +328,8 @@ func (builder *Builder) deployAPI() error {
 	svc := apigateway.New(session.New(), &aws.Config{Region: aws.String(region)})
 
 	params := &apigateway.CreateDeploymentInput{
-		RestApiId: builder.ApiGateway.Id, // Required
-		StageName: aws.String("prod"),    // Required
+		RestApiId: builder.ApiGateway.Id,
+		StageName: aws.String("prod"),
 	}
 	_, err := svc.CreateDeployment(params)
 
@@ -317,10 +340,10 @@ func (builder *Builder) addPermissions() error {
 	svc := lambda.New(session.New(), &aws.Config{Region: aws.String(region)})
 
 	params := &lambda.AddPermissionInput{
-		Action:       aws.String("lambda:InvokeFunction"),                                                 // Required
-		FunctionName: aws.String(functionName),                                                            // Required
-		Principal:    aws.String("apigateway.amazonaws.com"),                                              // Required
-		StatementId:  aws.String(fmt.Sprintf("apigateway-%s-test", aws.StringValue(builder.Resource.Id))), // Required
+		Action:       aws.String("lambda:InvokeFunction"),
+		FunctionName: aws.String(functionName),
+		Principal:    aws.String("apigateway.amazonaws.com"),
+		StatementId:  aws.String(fmt.Sprintf("apigateway-%s-test", aws.StringValue(builder.Resource.Id))),
 		SourceArn:    aws.String(fmt.Sprintf("%s/*/%s/%s", builder.ApiARN(), httpMethod, functionName)),
 	}
 	_, err := svc.AddPermission(params)
@@ -352,4 +375,34 @@ func (builder *Builder) Endpoint() string {
 		aws.StringValue(builder.ApiGateway.Id),
 		region,
 		FormatName())
+}
+
+func printSuccess(value string) {
+	if jsonOutput == false {
+		fmt.Println(value)
+	} else {
+		buf := new(bytes.Buffer)
+		response := struct {
+			Result string
+		}{Result: value}
+
+		responseString, _ := json.Marshal(response)
+		fmt.Fprintf(buf, "%s", responseString)
+		buf.WriteTo(os.Stdout)
+	}
+}
+
+func printFailure(value string) {
+	if jsonOutput == false {
+		fmt.Println(value)
+	} else {
+		buf := new(bytes.Buffer)
+		response := struct {
+			Error string
+		}{Error: value}
+
+		responseString, _ := json.Marshal(response)
+		fmt.Fprintf(buf, "%s", responseString)
+		buf.WriteTo(os.Stderr)
+	}
 }
