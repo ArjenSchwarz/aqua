@@ -21,9 +21,7 @@
 package cmd
 
 import (
-	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -51,8 +49,6 @@ var (
 	runtime        string
 	httpMethod     = "POST"
 )
-
-var helloworld64 = "UEsDBBQAAAAIAFqghkjgANcUYwAAAG4AAAAIABwAaW5kZXguanNVVAkAA8veBFfN3gRXdXgLAAEE9QEAAAQUAAAALYxBCsJAEATveUWTU4KyDzDkITnG3dYIZkZ2ZiVB/HsWsW4FRXF7aXYLyyzpyYwRtyLRHyod3xQ/I6o4N+/xaVD5a7ASI5m6dtICqyV8oRFzvpe1ql1anPB7hKumvR+a73AAUEsBAh4DFAAAAAgAWqCGSOAA1xRjAAAAbgAAAAgAGAAAAAAAAQAAAKSBAAAAAGluZGV4LmpzVVQFAAPL3gRXdXgLAAEE9QEAAAQUAAAAUEsFBgAAAAABAAEATgAAAKUAAAAAAA=="
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -375,34 +371,4 @@ func (builder *Builder) Endpoint() string {
 		aws.StringValue(builder.ApiGateway.Id),
 		region,
 		FormatName())
-}
-
-func printSuccess(value string) {
-	if jsonOutput == false {
-		fmt.Println(value)
-	} else {
-		buf := new(bytes.Buffer)
-		response := struct {
-			Result string
-		}{Result: value}
-
-		responseString, _ := json.Marshal(response)
-		fmt.Fprintf(buf, "%s", responseString)
-		buf.WriteTo(os.Stdout)
-	}
-}
-
-func printFailure(value string) {
-	if jsonOutput == false {
-		fmt.Println(value)
-	} else {
-		buf := new(bytes.Buffer)
-		response := struct {
-			Error string
-		}{Error: value}
-
-		responseString, _ := json.Marshal(response)
-		fmt.Fprintf(buf, "%s", responseString)
-		buf.WriteTo(os.Stderr)
-	}
 }
