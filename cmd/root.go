@@ -48,6 +48,7 @@ var (
 	authentication string
 	jsonOutput     bool
 	apikeyRequired bool
+	runtime        string
 	httpMethod     = "POST"
 )
 
@@ -60,8 +61,6 @@ var RootCmd = &cobra.Command{
 	Long: `Running aqua will create a gateway for the provided function.
 If the function doesn't exist yet, it will first create it using the provided
 file or a basic example that echoes back your parameters.
-
-Currently the runtime for the Lambda function is limited to NodeJS.
 `,
 	Run: buildGateway,
 }
@@ -81,6 +80,7 @@ func init() {
 	RootCmd.Flags().StringVarP(&filePath, "file", "f", "helloworld", "The zip file for your Lambda function")
 	RootCmd.Flags().BoolVarP(&apikeyRequired, "apikey", "k", false, "Endpoint can only be accessed with an API key")
 	RootCmd.Flags().BoolVar(&jsonOutput, "json", false, "Set to true to print output in JSON format")
+	RootCmd.Flags().StringVar(&runtime, "runtime", "nodejs4.3", "The runtime of the Lambda function. If no file is provided, this is always nodejs4.3")
 }
 
 func buildGateway(cmd *cobra.Command, args []string) {
@@ -203,7 +203,7 @@ func (builder *Builder) createLambdaFunction(svc *lambda.Lambda) error {
 		FunctionName: aws.String(functionName),
 		Handler:      aws.String("index.handler"),
 		Role:         role.Role.Arn,
-		Runtime:      aws.String("nodejs4.3"),
+		Runtime:      aws.String(runtime),
 	}
 	newLambda, err := svc.CreateFunction(params)
 
