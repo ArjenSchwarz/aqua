@@ -24,9 +24,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -54,9 +58,21 @@ var (
 var RootCmd = &cobra.Command{
 	Use:   "aqua",
 	Short: "Create a basic gateway for a Lambda function",
-	Long: `Running aqua will create a gateway for the provided function.
+	Long: `Create a gateway for the provided Lambda function.
+
 If the function doesn't exist yet, it will first create it using the provided
 file or a basic example that echoes back your parameters.
+
+For function code located online, the file will first be downloaded locally.
+
+Example (only create Gateway):
+aqua --name functionName --region us-west-1
+
+Example (create Lambda function from local file):
+aqua --name functionName --role basic_execution_role --file path/to/function.zip
+
+Example (create Lambda function from web file):
+aqua --name functionName --role basic_execution_role --file https://github.com/ArjenSchwarz/aqua/releases/download/latest/igor.zip
 `,
 	Run: buildGateway,
 }
@@ -64,20 +80,20 @@ file or a basic example that echoes back your parameters.
 // Execute is the main execution command as created by Cobra
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		printFailure(err.Error())
 		os.Exit(-1)
 	}
 }
 
 func init() {
-	RootCmd.Flags().StringVarP(&functionName, "name", "n", "", "The name of the Lambda function")
-	RootCmd.Flags().StringVarP(&roleName, "role", "r", "-", "The name of the Role for the lambda function. (Required when making a new Lambda function)")
-	RootCmd.Flags().StringVar(&region, "region", "us-east-1", "The region for the lambda function and API Gateway")
+	RootCmd.PersistentFlags().StringVarP(&functionName, "name", "n", "", "The name of the Lambda function")
+	RootCmd.PersistentFlags().StringVarP(&roleName, "role", "r", "", "The name of the IAM Role)")
+	RootCmd.PersistentFlags().StringVar(&region, "region", "us-east-1", "The region for the lambda function and API Gateway")
 	RootCmd.Flags().StringVarP(&authentication, "authentication", "a", "NONE", "The Authentication method to be used")
-	RootCmd.Flags().StringVarP(&filePath, "file", "f", "helloworld", "The zip file for your Lambda function")
+	RootCmd.Flags().StringVarP(&filePath, "file", "f", "", "The zip file for your Lambda function, either locally or http(s). The file will first be downloaded locally.")
 	RootCmd.Flags().BoolVarP(&apikeyRequired, "apikey", "k", false, "Endpoint can only be accessed with an API key")
-	RootCmd.Flags().BoolVar(&jsonOutput, "json", false, "Set to true to print output in JSON format")
-	RootCmd.Flags().StringVar(&runtime, "runtime", "nodejs4.3", "The runtime of the Lambda function. If no file is provided, this is always nodejs4.3")
+	RootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Set to true to print output in JSON format")
+	RootCmd.Flags().StringVar(&runtime, "runtime", "nodejs4.3", "The runtime of the Lambda function.")
 }
 
 func buildGateway(cmd *cobra.Command, args []string) {
@@ -170,7 +186,7 @@ func (builder *builder) ensureLambdaFunction() error {
 }
 
 func (builder *builder) createLambdaFunction(svc *lambda.Lambda) error {
-	if roleName == "-" {
+	if roleName == "" {
 		return errors.New("When creating a Lambda function you have to provide a Role for it using the --role flag")
 	}
 	role, err := builder.getRole(roleName)
@@ -181,12 +197,18 @@ func (builder *builder) createLambdaFunction(svc *lambda.Lambda) error {
 
 	var functionData []byte
 
-	if filePath == "helloworld" {
+	if filePath == "" {
 		functionData, err = base64.StdEncoding.DecodeString(helloworld64)
 		if err != nil {
 			return err
 		}
 	} else {
+		if filePath[0:5] == "http:" || filePath[0:6] == "https:" {
+			filePath, err = downloadFile(filePath)
+			if err != nil {
+				return err
+			}
+		}
 		functionData, err = ioutil.ReadFile(filePath)
 		if err != nil {
 			return err
@@ -359,6 +381,41 @@ func (builder *builder) addPermissions() error {
 	}
 
 	return err
+}
+
+func downloadFile(rawURL string) (string, error) {
+	fmt.Println("Downloading file...")
+
+	fileName := os.TempDir() + strconv.FormatInt(time.Now().Unix(), 10) + "aqua.zip"
+	file, err := os.Create(fileName)
+
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	check := http.Client{
+		CheckRedirect: func(r *http.Request, via []*http.Request) error {
+			r.URL.Opaque = r.URL.Path
+			return nil
+		},
+	}
+
+	resp, err := check.Get(rawURL) // add a filter to check redirect
+
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	fmt.Println(resp.Status)
+
+	_, err = io.Copy(file, resp.Body)
+
+	if err != nil {
+		return "", err
+	}
+
+	return fileName, nil
 }
 
 // APIARN returns the ARN of the API
