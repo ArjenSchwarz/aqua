@@ -58,7 +58,7 @@ To create a role, please use aqua role create.
 		for _, role := range resp.Roles {
 			list += fmt.Sprintf("\n* %s", aws.StringValue(role.RoleName))
 		}
-		// Pretty-print the response data.
+
 		printSuccess(list)
 	},
 }

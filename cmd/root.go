@@ -61,6 +61,7 @@ file or a basic example that echoes back your parameters.
 	Run: buildGateway,
 }
 
+// Execute is the main execution command as created by Cobra
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {
 		fmt.Println(err)
@@ -80,7 +81,7 @@ func init() {
 }
 
 func buildGateway(cmd *cobra.Command, args []string) {
-	builder := Builder{}
+	builder := builder{}
 	err := builder.ensureLambdaFunction()
 
 	if err != nil {
@@ -88,7 +89,7 @@ func buildGateway(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	err = builder.createApiGateway()
+	err = builder.createAPIGateway()
 
 	if err != nil {
 		printFailure(err.Error())
@@ -126,18 +127,18 @@ func buildGateway(cmd *cobra.Command, args []string) {
 	printSuccess(msg)
 }
 
-type Builder struct {
+type builder struct {
 	Lambda       *lambda.FunctionConfiguration
-	ApiGateway   *apigateway.RestApi
+	APIGateway   *apigateway.RestApi
 	RootResource *apigateway.Resource
 	Resource     *apigateway.Resource
 }
 
-func FormatName() string {
+func formatName() string {
 	return strings.ToLower(functionName)
 }
 
-func (*Builder) getRole(name string) (*iam.GetRoleOutput, error) {
+func (*builder) getRole(name string) (*iam.GetRoleOutput, error) {
 	svc := iam.New(session.New())
 
 	params := &iam.GetRoleInput{
@@ -146,7 +147,7 @@ func (*Builder) getRole(name string) (*iam.GetRoleOutput, error) {
 	return svc.GetRole(params)
 }
 
-func (builder *Builder) ensureLambdaFunction() error {
+func (builder *builder) ensureLambdaFunction() error {
 	svc := lambda.New(session.New(), &aws.Config{Region: aws.String(region)})
 
 	searchParams := &lambda.GetFunctionConfigurationInput{
@@ -168,7 +169,7 @@ func (builder *Builder) ensureLambdaFunction() error {
 	return nil
 }
 
-func (builder *Builder) createLambdaFunction(svc *lambda.Lambda) error {
+func (builder *builder) createLambdaFunction(svc *lambda.Lambda) error {
 	if roleName == "-" {
 		return errors.New("When creating a Lambda function you have to provide a Role for it using the --role flag")
 	}
@@ -212,11 +213,11 @@ func (builder *Builder) createLambdaFunction(svc *lambda.Lambda) error {
 	return nil
 }
 
-func (builder *Builder) createApiGateway() error {
+func (builder *builder) createAPIGateway() error {
 	svc := apigateway.New(session.New(), &aws.Config{Region: aws.String(region)})
 
 	params := &apigateway.CreateRestApiInput{
-		Name:        aws.String(fmt.Sprintf("%sAPI", FormatName())),
+		Name:        aws.String(fmt.Sprintf("%sAPI", formatName())),
 		Description: aws.String(fmt.Sprintf("API for Lambda function %s", functionName)),
 	}
 	gateway, err := svc.CreateRestApi(params)
@@ -224,16 +225,16 @@ func (builder *Builder) createApiGateway() error {
 		return err
 	}
 
-	builder.ApiGateway = gateway
+	builder.APIGateway = gateway
 
 	return nil
 }
 
-func (builder *Builder) addResources() error {
+func (builder *builder) addResources() error {
 	svc := apigateway.New(session.New(), &aws.Config{Region: aws.String(region)})
 
 	params := &apigateway.GetResourcesInput{
-		RestApiId: builder.ApiGateway.Id,
+		RestApiId: builder.APIGateway.Id,
 		Limit:     aws.Int64(1),
 	}
 	resp, err := svc.GetResources(params)
@@ -246,8 +247,8 @@ func (builder *Builder) addResources() error {
 
 	resourceParams := &apigateway.CreateResourceInput{
 		ParentId:  builder.RootResource.Id,
-		PathPart:  aws.String(FormatName()),
-		RestApiId: builder.ApiGateway.Id,
+		PathPart:  aws.String(formatName()),
+		RestApiId: builder.APIGateway.Id,
 	}
 	resource, err := svc.CreateResource(resourceParams)
 
@@ -260,7 +261,7 @@ func (builder *Builder) addResources() error {
 	return nil
 }
 
-func (builder *Builder) configureResources() error {
+func (builder *builder) configureResources() error {
 	svc := apigateway.New(session.New(), &aws.Config{Region: aws.String(region)})
 
 	uriString := fmt.Sprintf("arn:aws:apigateway:%s:lambda:path/2015-03-31/functions/%s/invocations", region, aws.StringValue(builder.Lambda.FunctionArn))
@@ -269,7 +270,7 @@ func (builder *Builder) configureResources() error {
 		AuthorizationType: aws.String(authentication),
 		HttpMethod:        aws.String(httpMethod),
 		ResourceId:        builder.Resource.Id,
-		RestApiId:         builder.ApiGateway.Id,
+		RestApiId:         builder.APIGateway.Id,
 		ApiKeyRequired:    aws.Bool(apikeyRequired),
 	}
 	_, err := svc.PutMethod(methodParams)
@@ -281,7 +282,7 @@ func (builder *Builder) configureResources() error {
 	params := &apigateway.PutIntegrationInput{
 		HttpMethod: aws.String(httpMethod),
 		ResourceId: builder.Resource.Id,
-		RestApiId:  builder.ApiGateway.Id,
+		RestApiId:  builder.APIGateway.Id,
 		Type:       aws.String("AWS"),
 		IntegrationHttpMethod: aws.String(httpMethod),
 		RequestTemplates: map[string]*string{
@@ -298,7 +299,7 @@ func (builder *Builder) configureResources() error {
 	integrationResponseParams := &apigateway.PutIntegrationResponseInput{
 		HttpMethod:       aws.String(httpMethod),
 		ResourceId:       builder.Resource.Id,
-		RestApiId:        builder.ApiGateway.Id,
+		RestApiId:        builder.APIGateway.Id,
 		StatusCode:       aws.String("200"),
 		SelectionPattern: aws.String(".*"),
 	}
@@ -311,7 +312,7 @@ func (builder *Builder) configureResources() error {
 	methodResponsParams := &apigateway.PutMethodResponseInput{
 		HttpMethod:     aws.String(httpMethod),
 		ResourceId:     builder.Resource.Id,
-		RestApiId:      builder.ApiGateway.Id,
+		RestApiId:      builder.APIGateway.Id,
 		StatusCode:     aws.String("200"),
 		ResponseModels: map[string]*string{},
 	}
@@ -320,11 +321,11 @@ func (builder *Builder) configureResources() error {
 	return err
 }
 
-func (builder *Builder) deployAPI() error {
+func (builder *builder) deployAPI() error {
 	svc := apigateway.New(session.New(), &aws.Config{Region: aws.String(region)})
 
 	params := &apigateway.CreateDeploymentInput{
-		RestApiId: builder.ApiGateway.Id,
+		RestApiId: builder.APIGateway.Id,
 		StageName: aws.String("prod"),
 	}
 	_, err := svc.CreateDeployment(params)
@@ -332,7 +333,7 @@ func (builder *Builder) deployAPI() error {
 	return err
 }
 
-func (builder *Builder) addPermissions() error {
+func (builder *builder) addPermissions() error {
 	svc := lambda.New(session.New(), &aws.Config{Region: aws.String(region)})
 
 	params := &lambda.AddPermissionInput{
@@ -340,7 +341,7 @@ func (builder *Builder) addPermissions() error {
 		FunctionName: aws.String(functionName),
 		Principal:    aws.String("apigateway.amazonaws.com"),
 		StatementId:  aws.String(fmt.Sprintf("apigateway-%s-test", aws.StringValue(builder.Resource.Id))),
-		SourceArn:    aws.String(fmt.Sprintf("%s/*/%s/%s", builder.ApiARN(), httpMethod, functionName)),
+		SourceArn:    aws.String(fmt.Sprintf("%s/*/%s/%s", builder.APIARN(), httpMethod, functionName)),
 	}
 	_, err := svc.AddPermission(params)
 
@@ -348,7 +349,7 @@ func (builder *Builder) addPermissions() error {
 		return err
 	}
 
-	params.SourceArn = aws.String(fmt.Sprintf("%s/prod/%s/%s", builder.ApiARN(), httpMethod, functionName))
+	params.SourceArn = aws.String(fmt.Sprintf("%s/prod/%s/%s", builder.APIARN(), httpMethod, functionName))
 	params.StatementId = aws.String(fmt.Sprintf("apigateway-%s-prod", aws.StringValue(builder.Resource.Id)))
 
 	_, err = svc.AddPermission(params)
@@ -360,15 +361,16 @@ func (builder *Builder) addPermissions() error {
 	return err
 }
 
-// ApiARN returns the ARN of the API
-func (builder *Builder) ApiARN() string {
+// APIARN returns the ARN of the API
+func (builder *builder) APIARN() string {
 	apiArn := strings.Replace(aws.StringValue(builder.Lambda.FunctionArn), "lambda", "execute-api", 1)
-	return strings.Replace(apiArn, fmt.Sprintf("function:%s", functionName), aws.StringValue(builder.ApiGateway.Id), 1)
+	return strings.Replace(apiArn, fmt.Sprintf("function:%s", functionName), aws.StringValue(builder.APIGateway.Id), 1)
 }
 
-func (builder *Builder) Endpoint() string {
+// Endpoint returns the endpoint of the API Gateway
+func (builder *builder) Endpoint() string {
 	return fmt.Sprintf("https://%s.execute-api.%s.amazonaws.com/prod/%s",
-		aws.StringValue(builder.ApiGateway.Id),
+		aws.StringValue(builder.APIGateway.Id),
 		region,
-		FormatName())
+		formatName())
 }
