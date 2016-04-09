@@ -22,8 +22,9 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
 	"strings"
+
+	"github.com/spf13/cobra"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -53,7 +54,7 @@ If you require a different role, please create it manually.
 func init() {
 	roleCmd.AddCommand(createCmd)
 
-	createCmd.Flags().StringVarP(&roleName, "role", "r", "", "The name you wish to give the role")
+	// createCmd.Flags().StringVarP(&roleName, "role", "r", "", "The name you wish to give the role")
 	createCmd.Flags().StringVarP(&roleType, "type", "t", "basic", "The type of the role")
 }
 
