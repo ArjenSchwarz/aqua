@@ -138,7 +138,7 @@ func buildGateway(cmd *cobra.Command, args []string) {
 
 	msg := fmt.Sprintf("Your endpoint is available at %s", builder.Endpoint())
 	if apikeyRequired {
-		msg += "\nRemember to configure your API keys before you can use"
+		msg += "\nRemember to configure your API keys before you can use this endpoint."
 	}
 	printSuccess(msg)
 }
@@ -401,7 +401,7 @@ func downloadFile(rawURL string) (string, error) {
 		},
 	}
 
-	resp, err := check.Get(rawURL) // add a filter to check redirect
+	resp, err := check.Get(rawURL)
 
 	if err != nil {
 		return "", err
