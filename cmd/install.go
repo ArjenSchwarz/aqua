@@ -43,7 +43,7 @@ Example:
 aqua install --name aqua -role aquarole
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		filePath = "https://github.com/ArjenSchwarz/aqua/releases/download/latest/lambda.zip"
+		filePath = "https://github.com/ArjenSchwarz/aqua/releases/download/latest/aqua_lambda.zip"
 		apikeyRequired = true
 		buildGateway(cmd, args)
 	},

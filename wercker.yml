@@ -33,13 +33,13 @@ build:
         name: create zip files
         code: |
           mkdir dist
-          zip -j dist/lambda.zip $WERCKER_OUTPUT_DIR/pkg/linux_amd64/aqua lambda/index.js
-          zip -j dist/darwin_amd64.zip $WERCKER_OUTPUT_DIR/pkg/darwin_amd64/aqua
-          zip -j dist/darwin_386.zip $WERCKER_OUTPUT_DIR/pkg/darwin_386/aqua
-          zip -j dist/windows_amd64.zip $WERCKER_OUTPUT_DIR/pkg/windows_amd64/aqua.exe
-          zip -j dist/windows_386.zip $WERCKER_OUTPUT_DIR/pkg/windows_386/aqua.exe
-          tar czf dist/linux_amd64.tgz -C $WERCKER_OUTPUT_DIR/pkg/linux_amd64 aqua
-          tar czf dist/linux_386.tgz -C $WERCKER_OUTPUT_DIR/pkg/linux_386 aqua
+          zip -j dist/aqua_lambda.zip $WERCKER_OUTPUT_DIR/pkg/linux_amd64/aqua lambda/index.js
+          zip -j dist/aqua_darwin_amd64.zip $WERCKER_OUTPUT_DIR/pkg/darwin_amd64/aqua
+          zip -j dist/aqua_darwin_386.zip $WERCKER_OUTPUT_DIR/pkg/darwin_386/aqua
+          zip -j dist/aqua_windows_amd64.zip $WERCKER_OUTPUT_DIR/pkg/windows_amd64/aqua.exe
+          zip -j dist/aqua_windows_386.zip $WERCKER_OUTPUT_DIR/pkg/windows_386/aqua.exe
+          tar czf dist/aqua_linux_amd64.tgz -C $WERCKER_OUTPUT_DIR/pkg/linux_amd64 aqua
+          tar czf dist/aqua_linux_386.tgz -C $WERCKER_OUTPUT_DIR/pkg/linux_386 aqua
           cp -R dist $WERCKER_OUTPUT_DIR
 
 deploy:
