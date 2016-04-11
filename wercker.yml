@@ -51,6 +51,7 @@ build:
           tar czf dist/linux_amd64.tgz -C $WERCKER_OUTPUT_DIR/pkg/linux_amd64 aqua
           tar czf dist/linux_386.tgz -C $WERCKER_OUTPUT_DIR/pkg/linux_386 aqua
           cp -R dist $ORG_SOURCE/
+          cp -R dist $WERCKER_OUTPUT_DIR
 
 deploy:
   steps:
