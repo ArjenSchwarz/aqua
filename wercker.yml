@@ -1,0 +1,61 @@
+box: golang
+build:
+  steps:
+    # Store the original source dir so we can pass the zip file to deploy
+    - script:
+      name: provide chance for deployment
+      code: |
+        export ORG_SOURCE=$WERCKER_SOURCE_DIR
+    # Sets the go workspace and places package
+    # at the right place in the workspace tree.
+    # Interferes with storing dist files.
+    - wercker/setup-go-workspace:
+      package-dir: github.com/ArjenSchwarz/aqua
+    # Get the dependencies
+    - script:
+        name: go get
+        code: |
+          cd $WERCKER_SOURCE_DIR
+          go version
+          go get -t ./...
+    - wercker/golint
+    - script:
+      name: go test
+      code: |
+          go test ./...
+    - script:
+        name: Install gox
+        code: |
+          go get -u -v github.com/inconshreveable/mousetrap
+          go get -u -v github.com/mitchellh/gox
+    - tcnksm/gox:
+        os: "darwin linux windows"
+        arch: "386 amd64"
+    - script:
+      name: check
+      code: ls -R $WERCKER_OUTPUT_DIR
+    - install-packages:
+      packages: zip
+    # We zip up all the files needed for deploying to Lambda.
+    # This then needs to be copied to the original source dir
+    # to ensure it's present in the deploy step
+    - script:
+        name: create zip files
+        code: |
+          mkdir dist
+          zip -j dist/lambda.zip $WERCKER_OUTPUT_DIR/pkg/linux_amd64/aqua lambda/index.js
+          zip -j dist/darwin_amd64.zip $WERCKER_OUTPUT_DIR/pkg/darwin_amd64/aqua
+          zip -j dist/darwin_386.zip $WERCKER_OUTPUT_DIR/pkg/darwin_386/aqua
+          zip -j dist/windows_amd64.zip $WERCKER_OUTPUT_DIR/pkg/windows_amd64/aqua.exe
+          zip -j dist/windows_386.zip $WERCKER_OUTPUT_DIR/pkg/windows_386/aqua.exe
+          tar czf dist/linux_amd64.tgz -C $WERCKER_OUTPUT_DIR/pkg/linux_amd64 aqua
+          tar czf dist/linux_386.tgz -C $WERCKER_OUTPUT_DIR/pkg/linux_386 aqua
+          cp -R dist $ORG_SOURCE/
+
+deploy:
+  steps:
+    - tcnksm/ghr:
+      token: $GITHUB_TOKEN
+      input: $WERCKER_SOURCE_DIR/dist
+      version: latest
+      replace: true

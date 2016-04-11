@@ -1,3 +1,9 @@
 aqua
 lambda/aqua
 lambda/aqua.zip
+
+# wercker cli paths
+_builds/
+_cache/
+_projects/
+_steps/
