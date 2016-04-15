@@ -20,7 +20,11 @@
 
 package cmd
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/ArjenSchwarz/aqua/builder"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/spf13/cobra"
+)
 
 // installCmd represents the install command
 var installCmd = &cobra.Command{
@@ -43,8 +47,8 @@ Example:
 aqua install --name aqua -role aquarole
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		filePath = "https://github.com/ArjenSchwarz/aqua/releases/download/latest/aqua_lambda.zip"
-		apikeyRequired = true
+		settings.FilePath = &builder.AquaLambdaURL
+		settings.ApikeyRequired = aws.Bool(true)
 		buildGateway(cmd, args)
 	},
 }

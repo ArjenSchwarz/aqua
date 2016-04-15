@@ -1,8 +1,13 @@
-package cmd
+package builder
 
-var helloworld64 = "UEsDBBQAAAAIAFqghkjgANcUYwAAAG4AAAAIABwAaW5kZXguanNVVAkAA8veBFfN3gRXdXgLAAEE9QEAAAQUAAAALYxBCsJAEATveUWTU4KyDzDkITnG3dYIZkZ2ZiVB/HsWsW4FRXF7aXYLyyzpyYwRtyLRHyod3xQ/I6o4N+/xaVD5a7ASI5m6dtICqyV8oRFzvpe1ql1anPB7hKumvR+a73AAUEsBAh4DFAAAAAgAWqCGSOAA1xRjAAAAbgAAAAgAGAAAAAAAAQAAAKSBAAAAAGluZGV4LmpzVVQFAAPL3gRXdXgLAAEE9QEAAAQUAAAAUEsFBgAAAAABAAEATgAAAKUAAAAAAA=="
+// AquaLambdaURL is the URL to the Lambda installation file for Aqua
+var AquaLambdaURL = "https://github.com/ArjenSchwarz/aqua/releases/download/latest/aqua_lambda.zip"
 
-var trustDocument = `{
+// Helloworld64 is a base64 encoded Hello World NodeJS app (zipfile)
+var Helloworld64 = "UEsDBBQAAAAIAFqghkjgANcUYwAAAG4AAAAIABwAaW5kZXguanNVVAkAA8veBFfN3gRXdXgLAAEE9QEAAAQUAAAALYxBCsJAEATveUWTU4KyDzDkITnG3dYIZkZ2ZiVB/HsWsW4FRXF7aXYLyyzpyYwRtyLRHyod3xQ/I6o4N+/xaVD5a7ASI5m6dtICqyV8oRFzvpe1ql1anPB7hKumvR+a73AAUEsBAh4DFAAAAAgAWqCGSOAA1xRjAAAAbgAAAAgAGAAAAAAAAQAAAKSBAAAAAGluZGV4LmpzVVQFAAPL3gRXdXgLAAEE9QEAAAQUAAAAUEsFBgAAAAABAAEATgAAAKUAAAAAAA=="
+
+// TrustDocument is a Lambda trustdocument for Role creation
+var TrustDocument = `{
   "Version": "2012-10-17",
   "Statement": {
     "Effect": "Allow",
@@ -12,7 +17,8 @@ var trustDocument = `{
 }
 `
 
-var basicRole = `{
+// BasicRole is the IAM Role configuration for a basic Lambda role
+var BasicRole = `{
   "Version": "2012-10-17",
   "Statement": [
     {
@@ -28,7 +34,8 @@ var basicRole = `{
 }
 `
 
-var s3Role = `{
+// S3Role is the IAM Role configuration for a Lambda role with S3 access
+var S3Role = `{
   "Version": "2012-10-17",
   "Statement": [
     {
@@ -54,7 +61,8 @@ var s3Role = `{
 }
 `
 
-var aquaRole = `{
+// AquaRole is the IAM Role configuration required for Aqua to run
+var AquaRole = `{
   "Version": "2012-10-17",
   "Statement": [
     {
