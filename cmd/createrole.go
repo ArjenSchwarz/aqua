@@ -24,11 +24,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/spf13/cobra"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/ArjenSchwarz/aqua/builder"
 )
 
 var (
@@ -47,6 +46,8 @@ You can only choose from the following types:
 * Aqua (Everything required for running Aqua)
 
 If you require a different role, please create it manually.
+
+Example: aqua role create --name basic_execution_role --type basic
 `,
 	Run: createRole,
 }
@@ -54,8 +55,7 @@ If you require a different role, please create it manually.
 func init() {
 	roleCmd.AddCommand(createCmd)
 
-	// createCmd.Flags().StringVarP(&roleName, "role", "r", "", "The name you wish to give the role")
-	createCmd.Flags().StringVarP(&roleType, "type", "t", "basic", "The type of the role")
+	settings.RoleType = createCmd.Flags().StringP("type", "t", "basic", "The type of the role")
 }
 
 func createRole(cmd *cobra.Command, args []string) {
@@ -63,45 +63,21 @@ func createRole(cmd *cobra.Command, args []string) {
 	var roleTemplate string
 	switch roleType {
 	case "basic":
-		roleTemplate = basicRole
+		roleTemplate = builder.BasicRole
 	case "s3":
-		roleTemplate = s3Role
+		roleTemplate = builder.S3Role
 	case "aqua":
-		roleTemplate = aquaRole
+		roleTemplate = builder.AquaRole
 	default:
 		printFailure("I'm sorry, but I can't create that role for you.")
 		return
 	}
-	err := doRoleCreation(roleTemplate)
+	err := builder.CreateIAMRole(roleTemplate, settings.RoleName)
 	if err != nil {
 		printFailure(err.Error())
 		return
 	}
-	printSuccess(fmt.Sprintf("Role %s of type %s has been created", roleName, roleType))
-}
-
-func doRoleCreation(roleTemplate string) error {
-	svc := iam.New(session.New())
-
-	params := &iam.CreateRoleInput{
-		AssumeRolePolicyDocument: aws.String(trustDocument), // Required
-		RoleName:                 aws.String(roleName),      // Required
-	}
-	_, err := svc.CreateRole(params)
-
-	if err != nil {
-		return err
-	}
-
-	putParams := &iam.PutRolePolicyInput{
-		PolicyDocument: aws.String(roleTemplate),     // Required
-		PolicyName:     aws.String("policyNameType"), // Required
-		RoleName:       aws.String(roleName),         // Required
-	}
-	_, err = svc.PutRolePolicy(putParams)
-
-	if err != nil {
-		return err
-	}
-	return nil
+	printSuccess(fmt.Sprintf("Role %s of type %s has been created",
+		aws.StringValue(settings.RoleName),
+		aws.StringValue(settings.RoleType)))
 }

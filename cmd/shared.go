@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+
+	"github.com/aws/aws-sdk-go/aws"
 )
 
 func printSuccess(value string) {
-	if jsonOutput == false {
+	if !aws.BoolValue(settings.JSONOutput) {
 		fmt.Println(value)
 	} else {
 		buf := new(bytes.Buffer)
@@ -23,7 +25,7 @@ func printSuccess(value string) {
 }
 
 func printFailure(value string) {
-	if jsonOutput == false {
+	if !aws.BoolValue(settings.JSONOutput) {
 		fmt.Println(value)
 	} else {
 		buf := new(bytes.Buffer)

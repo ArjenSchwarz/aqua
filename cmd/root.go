@@ -21,38 +21,20 @@
 package cmd
 
 import (
-	"encoding/base64"
-	"errors"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"net/http"
 	"os"
-	"strconv"
-	"strings"
-	"time"
 
+	"github.com/ArjenSchwarz/aqua/builder"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/apigateway"
-	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/aws/aws-sdk-go/service/lambda"
 
 	"github.com/spf13/cobra"
 )
 
 var (
-	functionName   string
-	roleName       string
-	region         string
-	filePath       string
-	authentication string
-	jsonOutput     bool
-	apikeyRequired bool
-	runtime        string
-	httpMethod     = "POST"
+	httpMethod = "POST"
 )
+
+var settings = new(builder.Config)
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -86,348 +68,60 @@ func Execute() {
 }
 
 func init() {
-	RootCmd.PersistentFlags().StringVarP(&functionName, "name", "n", "", "The name of the Lambda function")
-	RootCmd.PersistentFlags().StringVarP(&roleName, "role", "r", "", "The name of the IAM Role)")
-	RootCmd.PersistentFlags().StringVar(&region, "region", "us-east-1", "The region for the lambda function and API Gateway")
-	RootCmd.Flags().StringVarP(&authentication, "authentication", "a", "NONE", "The Authentication method to be used")
-	RootCmd.Flags().StringVarP(&filePath, "file", "f", "", "The zip file for your Lambda function, either locally or http(s). The file will first be downloaded locally.")
-	RootCmd.Flags().BoolVarP(&apikeyRequired, "apikey", "k", false, "Endpoint can only be accessed with an API key")
-	RootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Set to true to print output in JSON format")
-	RootCmd.Flags().StringVar(&runtime, "runtime", "nodejs4.3", "The runtime of the Lambda function.")
+	settings.FunctionName = RootCmd.PersistentFlags().StringP("name", "n", "", "The name of the Lambda function")
+	settings.RoleName = RootCmd.PersistentFlags().StringP("role", "r", "", "The name of the IAM Role")
+	settings.Region = RootCmd.PersistentFlags().String("region", "us-east-1", "The region for the lambda function and API Gateway")
+	settings.Authentication = RootCmd.Flags().StringP("authentication", "a", "NONE", "The Authentication method to be used")
+	settings.FilePath = RootCmd.Flags().StringP("file", "f", "", "The zip file for your Lambda function, either locally or http(s). The file will first be downloaded locally.")
+	settings.ApikeyRequired = RootCmd.Flags().BoolP("apikey", "k", false, "Endpoint can only be accessed with an API key")
+	settings.JSONOutput = RootCmd.PersistentFlags().Bool("json", false, "Set to true to print output in JSON format")
+	settings.Runtime = RootCmd.Flags().String("runtime", "nodejs4.3", "The runtime of the Lambda function.")
 }
 
 func buildGateway(cmd *cobra.Command, args []string) {
-	builder := builder{}
-	err := builder.ensureLambdaFunction()
+	settings.HTTPMethod = aws.String("POST") //For now we force the HTTP method to POST
+	builder := builder.GatewayBuilder{Settings: settings}
+	err := builder.EnsureLambdaFunction()
 
 	if err != nil {
 		printFailure(err.Error())
 		return
 	}
 
-	err = builder.createAPIGateway()
+	err = builder.CreateAPIGateway()
 
 	if err != nil {
 		printFailure(err.Error())
 		return
 	}
 
-	err = builder.addResources()
+	err = builder.AddResources()
 	if err != nil {
 		printFailure(err.Error())
 		return
 	}
 
-	err = builder.configureResources()
+	err = builder.ConfigureResources()
 	if err != nil {
 		printFailure(err.Error())
 		return
 	}
 
-	err = builder.deployAPI()
+	err = builder.DeployAPI()
 	if err != nil {
 		printFailure(err.Error())
 		return
 	}
 
-	err = builder.addPermissions()
+	err = builder.AddPermissions()
 	if err != nil {
 		printFailure(err.Error())
 		return
 	}
 
 	msg := fmt.Sprintf("Your endpoint is available at %s", builder.Endpoint())
-	if apikeyRequired {
+	if aws.BoolValue(settings.ApikeyRequired) {
 		msg += "\nRemember to configure your API keys before you can use this endpoint."
 	}
 	printSuccess(msg)
-}
-
-type builder struct {
-	Lambda       *lambda.FunctionConfiguration
-	APIGateway   *apigateway.RestApi
-	RootResource *apigateway.Resource
-	Resource     *apigateway.Resource
-}
-
-func formatName() string {
-	return strings.ToLower(functionName)
-}
-
-func (*builder) getRole(name string) (*iam.GetRoleOutput, error) {
-	svc := iam.New(session.New())
-
-	params := &iam.GetRoleInput{
-		RoleName: aws.String(name),
-	}
-	return svc.GetRole(params)
-}
-
-func (builder *builder) ensureLambdaFunction() error {
-	svc := lambda.New(session.New(), &aws.Config{Region: aws.String(region)})
-
-	searchParams := &lambda.GetFunctionConfigurationInput{
-		FunctionName: aws.String(functionName),
-	}
-	lambda, err := svc.GetFunctionConfiguration(searchParams)
-
-	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			// If it didn't find the function, we can create it
-			if awsErr.Code() == "ResourceNotFoundException" {
-				return builder.createLambdaFunction(svc)
-			}
-		}
-		return err
-	}
-	builder.Lambda = lambda
-
-	return nil
-}
-
-func (builder *builder) createLambdaFunction(svc *lambda.Lambda) error {
-	if roleName == "" {
-		return errors.New("When creating a Lambda function you have to provide a Role for it using the --role flag")
-	}
-	role, err := builder.getRole(roleName)
-
-	if err != nil {
-		return err
-	}
-
-	var functionData []byte
-
-	if filePath == "" {
-		functionData, err = base64.StdEncoding.DecodeString(helloworld64)
-		if err != nil {
-			return err
-		}
-	} else {
-		if filePath[0:5] == "http:" || filePath[0:6] == "https:" {
-			filePath, err = downloadFile(filePath)
-			if err != nil {
-				return err
-			}
-		}
-		functionData, err = ioutil.ReadFile(filePath)
-		if err != nil {
-			return err
-		}
-	}
-
-	params := &lambda.CreateFunctionInput{
-		Code: &lambda.FunctionCode{
-			ZipFile: functionData,
-		},
-		FunctionName: aws.String(functionName),
-		Handler:      aws.String("index.handler"),
-		Role:         role.Role.Arn,
-		Runtime:      aws.String(runtime),
-	}
-	newLambda, err := svc.CreateFunction(params)
-
-	if err != nil {
-		return err
-	}
-
-	builder.Lambda = newLambda
-
-	return nil
-}
-
-func (builder *builder) createAPIGateway() error {
-	svc := apigateway.New(session.New(), &aws.Config{Region: aws.String(region)})
-
-	params := &apigateway.CreateRestApiInput{
-		Name:        aws.String(fmt.Sprintf("%sAPI", formatName())),
-		Description: aws.String(fmt.Sprintf("API for Lambda function %s", functionName)),
-	}
-	gateway, err := svc.CreateRestApi(params)
-	if err != nil {
-		return err
-	}
-
-	builder.APIGateway = gateway
-
-	return nil
-}
-
-func (builder *builder) addResources() error {
-	svc := apigateway.New(session.New(), &aws.Config{Region: aws.String(region)})
-
-	params := &apigateway.GetResourcesInput{
-		RestApiId: builder.APIGateway.Id,
-		Limit:     aws.Int64(1),
-	}
-	resp, err := svc.GetResources(params)
-
-	if err != nil {
-		return err
-	}
-
-	builder.RootResource = resp.Items[0]
-
-	resourceParams := &apigateway.CreateResourceInput{
-		ParentId:  builder.RootResource.Id,
-		PathPart:  aws.String(formatName()),
-		RestApiId: builder.APIGateway.Id,
-	}
-	resource, err := svc.CreateResource(resourceParams)
-
-	if err != nil {
-		return err
-	}
-
-	builder.Resource = resource
-
-	return nil
-}
-
-func (builder *builder) configureResources() error {
-	svc := apigateway.New(session.New(), &aws.Config{Region: aws.String(region)})
-
-	uriString := fmt.Sprintf("arn:aws:apigateway:%s:lambda:path/2015-03-31/functions/%s/invocations", region, aws.StringValue(builder.Lambda.FunctionArn))
-
-	methodParams := &apigateway.PutMethodInput{
-		AuthorizationType: aws.String(authentication),
-		HttpMethod:        aws.String(httpMethod),
-		ResourceId:        builder.Resource.Id,
-		RestApiId:         builder.APIGateway.Id,
-		ApiKeyRequired:    aws.Bool(apikeyRequired),
-	}
-	_, err := svc.PutMethod(methodParams)
-
-	if err != nil {
-		return err
-	}
-
-	params := &apigateway.PutIntegrationInput{
-		HttpMethod: aws.String(httpMethod),
-		ResourceId: builder.Resource.Id,
-		RestApiId:  builder.APIGateway.Id,
-		Type:       aws.String("AWS"),
-		IntegrationHttpMethod: aws.String(httpMethod),
-		RequestTemplates: map[string]*string{
-			"application/x-www-form-urlencoded": aws.String(`{"body": $input.json("$")}`),
-		},
-		Uri: aws.String(uriString),
-	}
-	_, err = svc.PutIntegration(params)
-
-	if err != nil {
-		return err
-	}
-
-	integrationResponseParams := &apigateway.PutIntegrationResponseInput{
-		HttpMethod:       aws.String(httpMethod),
-		ResourceId:       builder.Resource.Id,
-		RestApiId:        builder.APIGateway.Id,
-		StatusCode:       aws.String("200"),
-		SelectionPattern: aws.String(".*"),
-	}
-	_, err = svc.PutIntegrationResponse(integrationResponseParams)
-
-	if err != nil {
-		return err
-	}
-
-	methodResponsParams := &apigateway.PutMethodResponseInput{
-		HttpMethod:     aws.String(httpMethod),
-		ResourceId:     builder.Resource.Id,
-		RestApiId:      builder.APIGateway.Id,
-		StatusCode:     aws.String("200"),
-		ResponseModels: map[string]*string{},
-	}
-	_, err = svc.PutMethodResponse(methodResponsParams)
-
-	return err
-}
-
-func (builder *builder) deployAPI() error {
-	svc := apigateway.New(session.New(), &aws.Config{Region: aws.String(region)})
-
-	params := &apigateway.CreateDeploymentInput{
-		RestApiId: builder.APIGateway.Id,
-		StageName: aws.String("prod"),
-	}
-	_, err := svc.CreateDeployment(params)
-
-	return err
-}
-
-func (builder *builder) addPermissions() error {
-	svc := lambda.New(session.New(), &aws.Config{Region: aws.String(region)})
-
-	params := &lambda.AddPermissionInput{
-		Action:       aws.String("lambda:InvokeFunction"),
-		FunctionName: aws.String(functionName),
-		Principal:    aws.String("apigateway.amazonaws.com"),
-		StatementId:  aws.String(fmt.Sprintf("apigateway-%s-test", aws.StringValue(builder.Resource.Id))),
-		SourceArn:    aws.String(fmt.Sprintf("%s/*/%s/%s", builder.APIARN(), httpMethod, functionName)),
-	}
-	_, err := svc.AddPermission(params)
-
-	if err != nil {
-		return err
-	}
-
-	params.SourceArn = aws.String(fmt.Sprintf("%s/prod/%s/%s", builder.APIARN(), httpMethod, functionName))
-	params.StatementId = aws.String(fmt.Sprintf("apigateway-%s-prod", aws.StringValue(builder.Resource.Id)))
-
-	_, err = svc.AddPermission(params)
-
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func downloadFile(rawURL string) (string, error) {
-	fmt.Println("Downloading file...")
-
-	fileName := os.TempDir() + strconv.FormatInt(time.Now().Unix(), 10) + "aqua.zip"
-	file, err := os.Create(fileName)
-
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	check := http.Client{
-		CheckRedirect: func(r *http.Request, via []*http.Request) error {
-			r.URL.Opaque = r.URL.Path
-			return nil
-		},
-	}
-
-	resp, err := check.Get(rawURL)
-
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	fmt.Println(resp.Status)
-
-	_, err = io.Copy(file, resp.Body)
-
-	if err != nil {
-		return "", err
-	}
-
-	return fileName, nil
-}
-
-// APIARN returns the ARN of the API
-func (builder *builder) APIARN() string {
-	apiArn := strings.Replace(aws.StringValue(builder.Lambda.FunctionArn), "lambda", "execute-api", 1)
-	return strings.Replace(apiArn, fmt.Sprintf("function:%s", functionName), aws.StringValue(builder.APIGateway.Id), 1)
-}
-
-// Endpoint returns the endpoint of the API Gateway
-func (builder *builder) Endpoint() string {
-	return fmt.Sprintf("https://%s.execute-api.%s.amazonaws.com/prod/%s",
-		aws.StringValue(builder.APIGateway.Id),
-		region,
-		formatName())
 }

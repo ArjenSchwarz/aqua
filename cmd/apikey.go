@@ -23,41 +23,36 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/spf13/cobra"
-
-	"github.com/ArjenSchwarz/aqua/builder"
 )
 
-// roleCmd represents the role command
-var roleCmd = &cobra.Command{
-	Use:   "role",
-	Short: "Display or create IAM roles",
-	Long: `Running aqua role will display the names of all the roles you have access to.
+// apikeyCmd represents the apikey command
+var apikeyCmd = &cobra.Command{
+	Use:   "apikey",
+	Short: "A brief description of your command",
+	Long: `A longer description that spans multiple lines and likely contains examples
+and usage of using your command. For example:
 
-To create an IAM role, please use aqua role create.
-`,
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		resp, err := builder.GetRoles()
-
-		if err != nil {
-			printFailure(err.Error())
-			return
-		}
-
-		if len(resp.Roles) == 0 {
-			printSuccess("No roles have been found.")
-			return
-		}
-		var list = "The following roles have been found:"
-		for _, role := range resp.Roles {
-			list += fmt.Sprintf("\n* %s", aws.StringValue(role.RoleName))
-		}
-
-		printSuccess(list)
+		// TODO: Work your own magic here
+		fmt.Println("apikey called")
 	},
 }
 
 func init() {
-	RootCmd.AddCommand(roleCmd)
+	RootCmd.AddCommand(apikeyCmd)
+
+	// Here you will define your flags and configuration settings.
+
+	// Cobra supports Persistent Flags which will work for this command
+	// and all subcommands, e.g.:
+	// apikeyCmd.PersistentFlags().String("foo", "", "A help for foo")
+
+	// Cobra supports local flags which will only run when this command
+	// is called directly, e.g.:
+	// apikeyCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
 }
