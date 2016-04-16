@@ -24,6 +24,21 @@ func printSuccess(value string) {
 	}
 }
 
+func printSliceMaps(values []map[string]string) {
+	buf := new(bytes.Buffer)
+	if !aws.BoolValue(settings.JSONOutput) {
+		for _, item := range values {
+			for key, value := range item {
+				fmt.Fprintf(buf, "%s: %s\n", key, value)
+			}
+		}
+	} else {
+		responseString, _ := json.Marshal(values)
+		fmt.Fprintf(buf, "%s", responseString)
+	}
+	buf.WriteTo(os.Stdout)
+}
+
 func printFailure(value string) {
 	if !aws.BoolValue(settings.JSONOutput) {
 		fmt.Println(value)

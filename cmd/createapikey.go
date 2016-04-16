@@ -23,33 +23,44 @@ package cmd
 import (
 	"github.com/ArjenSchwarz/aqua/builder"
 	"github.com/aws/aws-sdk-go/aws"
-
 	"github.com/spf13/cobra"
 )
 
-// apikeyCmd represents the apikey command
-var apikeyCmd = &cobra.Command{
-	Use:   "apikey",
-	Short: "List and create API keys",
-	Long:  `List your available API keys`,
+// createapikeyCmd represents the createapikey command
+var createapikeyCmd = &cobra.Command{
+	Use:   "create",
+	Short: "Create an API key",
+	Long:  `Creates an API key in the region specified (defaults to us-east-1)`,
 	Run: func(cmd *cobra.Command, args []string) {
-		keys, err := builder.ListAPIKeys(settings)
+		key, err := builder.CreateAPIKey(keyname, keydescription, keyenabled, apiid, settings.Region)
 		if err != nil {
 			printFailure(err.Error())
 			return
 		}
-		values := make([]map[string]string, len(keys.Items))
-		for index, key := range keys.Items {
-			keydef := make(map[string]string)
-			keydef["name"] = aws.StringValue(key.Name)
-			keydef["description"] = aws.StringValue(key.Description)
-			keydef["apikey"] = aws.StringValue(key.Id)
-			values[index] = keydef
-		}
-		printSliceMaps(values)
+		printSuccess(aws.StringValue(key.Id))
 	},
 }
 
+var (
+	keyname        string
+	keydescription string
+	keyenabled     bool
+	apiid          string
+)
+
 func init() {
-	RootCmd.AddCommand(apikeyCmd)
+	apikeyCmd.AddCommand(createapikeyCmd)
+
+	// Here you will define your flags and configuration settings.
+
+	// Cobra supports Persistent Flags which will work for this command
+	// and all subcommands, e.g.:
+	// createapikeyCmd.PersistentFlags().String("foo", "", "A help for foo")
+
+	// Cobra supports local flags which will only run when this command
+	// is called directly, e.g.:
+	createapikeyCmd.Flags().BoolVar(&keyenabled, "enabled", true, "Should the key be enabled")
+	createapikeyCmd.Flags().StringVar(&keyname, "keyname", "", "The name for the key")
+	createapikeyCmd.Flags().StringVar(&keydescription, "description", "", "The description for the key")
+	createapikeyCmd.Flags().StringVar(&apiid, "apiid", "", "The ID of the API you wish to attach the key to")
 }
