@@ -21,7 +21,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/ArjenSchwarz/aqua/builder"
@@ -119,9 +118,11 @@ func buildGateway(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	msg := fmt.Sprintf("Your endpoint is available at %s", builder.Endpoint())
+	messages := make(map[string]string)
+	messages["endpoint"] = builder.Endpoint()
+	messages["api"] = aws.StringValue(builder.APIGateway.Id)
 	if aws.BoolValue(settings.ApikeyRequired) {
-		msg += "\nRemember to configure your API keys before you can use this endpoint."
+		messages["note"] = "Remember to configure your API keys before you can use this endpoint."
 	}
-	printSuccess(msg)
+	printMap(messages)
 }
