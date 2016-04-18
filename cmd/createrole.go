@@ -59,7 +59,7 @@ func init() {
 }
 
 func createRole(cmd *cobra.Command, args []string) {
-	roleType = strings.ToLower(roleType)
+	roleType = strings.ToLower(aws.StringValue(settings.RoleType))
 	var roleTemplate string
 	switch roleType {
 	case "basic":
