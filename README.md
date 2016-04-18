@@ -14,6 +14,8 @@ Aqua is *not* a tool for managing your API Gateways or Lambda functions. If you 
 
 # Usage
 
+![Demo](https://cloud.githubusercontent.com/assets/1787643/14594491/7c09ac98-057a-11e6-9cf4-1097d1c887b9.gif)
+
 An explanation of all options is available through Aqua's help.
 
 ```bash
@@ -23,8 +25,9 @@ Usage:
   aqua [command]
 
 Available Commands:
+  apikey      List and create API keys
   install     Install Aqua as a Lambda function
-  role        Display or create roles
+  role        Display or create IAM roles
 
 Flags:
   -k, --apikey                  Endpoint can only be accessed with an API key
@@ -33,7 +36,7 @@ Flags:
       --json                    Set to true to print output in JSON format
   -n, --name string             The name of the Lambda function
       --region string           The region for the lambda function and API Gateway (default "us-east-1")
-  -r, --role string             The name of the IAM Role)
+  -r, --role string             The name of the IAM Role
       --runtime string          The runtime of the Lambda function. (default "nodejs4.3")
 
 Use "aqua [command] --help" for more information about a command.
@@ -87,7 +90,7 @@ First [download Aqua][latest] to your local machine, and then ensure you have a 
 $ aqua role create --role RoleName --type aqua
 ```
 
-Or you can manually create the role, with the permissions as shown [here][permissionslink].
+Or you can manually create the role, with the permissions as shown in the code [here][permissionslink].
 
 You can then install Aqua using:
 
@@ -99,7 +102,7 @@ This will download the latest version of the Lambda function, and install it wit
 
 For security reasons, `aqua install` enforces the use of API keys. This means that after the installation you will need to assign those keys or set up a different authentication method. As Aqua can create unprotected endpoints for your Lambda functions, it is recommended you always require some form of authentication.
 
-[permissionslink]: https://github.com/ArjenSchwarz/aqua
+[permissionslink]: https://github.com/ArjenSchwarz/aqua/blob/master/builder/filedef.go
 
 # Development
 
@@ -113,7 +116,5 @@ If you wish to contribute you can always create Issues or Pull Requests. For Pul
 
 ## TODO
 
-* Create the releases on GitHub using Wercker
-* Internal restructuring to make more sense (move stuff out of the root command)
 * Add tests
 * More documentation
