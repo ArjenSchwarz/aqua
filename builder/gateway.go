@@ -13,7 +13,7 @@ func (builder *GatewayBuilder) CreateAPIGateway() error {
 	svc := apigateway.New(session.New(), &aws.Config{Region: builder.Settings.Region})
 
 	params := &apigateway.CreateRestApiInput{
-		Name: aws.String(fmt.Sprintf("%sLambdaI", builder.Settings.CleanName())),
+		Name: aws.String(fmt.Sprintf("%sLambda", builder.Settings.CleanName())),
 		Description: aws.String(fmt.Sprintf("API for Lambda function %s",
 			aws.StringValue(builder.Settings.FunctionName))),
 	}
