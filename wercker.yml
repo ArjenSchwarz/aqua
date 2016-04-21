@@ -45,13 +45,13 @@ build:
 deploy:
   github:
     - tcnksm/ghr:
-      token: $GITHUB_TOKEN
-      input: $WERCKER_SOURCE_DIR/dist
-      version: latest
-      replace: true
+        token: $GITHUB_TOKEN
+        input: $WERCKER_SOURCE_DIR/dist
+        version: latest
+        replace: true
   lambda:
     - arjen/lambda:
-      access_key: $AWS_ACCESS_KEY
-      secret_key: $AWS_SECRET_KEY
-      function_name: aqua
-      filepath: $WERCKER_SOURCE_DIR/dist/aqua_lambda.zip
+        access_key: $AWS_ACCESS_KEY
+        secret_key: $AWS_SECRET_KEY
+        function_name: aqua
+        filepath: $WERCKER_SOURCE_DIR/dist/aqua_lambda.zip
