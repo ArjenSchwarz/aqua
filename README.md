@@ -70,9 +70,9 @@ If installed as a Lambda function, Aqua is capable only of adding a Gateway to a
 
 You will have to post the values, where the form fields have the same name as the flags when running it from the command line.
 
-# Installation
+# Installation and configuration
 
-Simply download the [latest release][latest] for your platform, and you can use it. You can place it somewhere in your PATH to ensure you can run it from anywhere.
+Simply download the [latest release][latest] for your platform, and you can use it. You can place it somewhere in your $PATH to ensure you can run it from anywhere.
 
 The AWS configuration is read from the standard locations:
 

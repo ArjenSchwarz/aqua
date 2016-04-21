@@ -32,11 +32,12 @@ var installCmd = &cobra.Command{
 	Short: "Install Aqua as a Lambda function",
 	Long: `Use this command to install Aqua as a Lambda function.
 
-It will download the latest version from GitHub, and install it as a Lambda
+The latest version of Aqua will be downloaded from GitHub and installed as a Lambda
 function with the name you specify.
 
 Due to potential security risks, Aqua will always be installed with API keys
-being required.
+being required. You can afterwards create an API key using the "aqua apikey create"
+command or assign one in the AWS Console.
 
 Before you do this, you first have to ensure you have an IAM role with all the
 required permissions. You can use the following command to create such a role:
