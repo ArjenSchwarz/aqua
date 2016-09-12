@@ -18,6 +18,8 @@ type Config struct {
 	Runtime        *string
 	RoleType       *string
 	HTTPMethod     *string
+	Schedule       *string
+	RoleFilename   *string
 }
 
 // IsWebPath checks if the provided filepath is a web address

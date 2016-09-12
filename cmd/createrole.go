@@ -22,6 +22,8 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -56,6 +58,7 @@ func init() {
 	roleCmd.AddCommand(createCmd)
 
 	settings.RoleType = createCmd.Flags().StringP("type", "t", "basic", "The type of the role")
+	settings.RoleFilename = createCmd.Flags().String("filename", "", "The role description you want to add")
 }
 
 func createRole(cmd *cobra.Command, args []string) {
@@ -68,6 +71,17 @@ func createRole(cmd *cobra.Command, args []string) {
 		roleTemplate = builder.S3Role
 	case "aqua":
 		roleTemplate = builder.AquaRole
+	case "custom":
+		if _, err := os.Stat(*settings.RoleFilename); err != nil {
+			printFailure(err.Error())
+			return
+		}
+		roleContents, err := ioutil.ReadFile(*settings.RoleFilename)
+		if err != nil {
+			printFailure(err.Error())
+			return
+		}
+		roleTemplate = string(roleContents)
 	default:
 		printFailure("I'm sorry, but I can't create that role for you.")
 		return
