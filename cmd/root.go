@@ -71,10 +71,11 @@ func init() {
 	settings.RoleName = RootCmd.PersistentFlags().StringP("role", "r", "", "The name of the IAM Role")
 	settings.Region = RootCmd.PersistentFlags().String("region", "us-east-1", "The region for the lambda function and API Gateway")
 	settings.Authentication = RootCmd.Flags().StringP("authentication", "a", "NONE", "The Authentication method to be used")
-	settings.FilePath = RootCmd.Flags().StringP("file", "f", "", "The zip file for your Lambda function, either locally or http(s). The file will first be downloaded locally.")
+	settings.FilePath = RootCmd.PersistentFlags().StringP("file", "f", "", "The zip file for your Lambda function, either locally or http(s). The file will first be downloaded locally.")
 	settings.ApikeyRequired = RootCmd.Flags().BoolP("apikey", "k", false, "Endpoint can only be accessed with an API key")
 	settings.JSONOutput = RootCmd.PersistentFlags().Bool("json", false, "Set to true to print output in JSON format")
 	settings.Runtime = RootCmd.Flags().String("runtime", "nodejs4.3", "The runtime of the Lambda function.")
+	settings.NoGateway = RootCmd.Flags().Bool("nogateway", false, "Disable the creation of a Gateway. Only create the Lambda function.")
 }
 
 func buildGateway(cmd *cobra.Command, args []string) {
@@ -84,6 +85,10 @@ func buildGateway(cmd *cobra.Command, args []string) {
 
 	if err != nil {
 		printFailure(err.Error())
+		return
+	}
+
+	if *settings.NoGateway {
 		return
 	}
 

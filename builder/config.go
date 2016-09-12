@@ -20,6 +20,7 @@ type Config struct {
 	HTTPMethod     *string
 	Schedule       *string
 	RoleFilename   *string
+	NoGateway      *bool
 }
 
 // IsWebPath checks if the provided filepath is a web address
