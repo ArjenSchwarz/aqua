@@ -8,12 +8,15 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/cloudwatchevents"
 	"github.com/aws/aws-sdk-go/service/lambda"
 )
 
@@ -167,4 +170,68 @@ func downloadFile(rawURL string) (*string, error) {
 	}
 
 	return &fileName, nil
+}
+
+// CreateSchedule creates a schedule for a Lambda function
+func CreateSchedule(settings *Config, schedule string) error {
+	svc := lambdaSession(settings)
+
+	searchParams := &lambda.GetFunctionConfigurationInput{
+		FunctionName: settings.FunctionName,
+	}
+	lambdaInst, err := svc.GetFunctionConfiguration(searchParams)
+
+	if err != nil {
+		return err
+	}
+	params := &lambda.AddPermissionInput{
+		Action:       aws.String("lambda:InvokeFunction"),
+		FunctionName: settings.FunctionName,
+		Principal:    aws.String("events.amazonaws.com"),
+		StatementId:  aws.String(fmt.Sprintf("scheduler-%s", *settings.FunctionName)),
+		SourceArn:    aws.String(createEventARN(lambdaInst)),
+	}
+	_, err = svc.AddPermission(params)
+	if err != nil {
+		return err
+	}
+
+	eventssvc := cloudwatchevents.New(session.New(), &aws.Config{Region: settings.Region})
+
+	cleanedName := cleanName(schedule)
+
+	putruleparams := &cloudwatchevents.PutRuleInput{
+		Name:               aws.String(cleanedName),
+		ScheduleExpression: aws.String(schedule),
+	}
+	_, err = eventssvc.PutRule(putruleparams)
+	if err != nil {
+		return err
+	}
+
+	puttargetparams := &cloudwatchevents.PutTargetsInput{
+		Rule: aws.String(cleanedName),
+		Targets: []*cloudwatchevents.Target{
+			{
+				Arn: lambdaInst.FunctionArn,
+				Id:  aws.String("1"),
+			},
+		},
+	}
+	_, err = eventssvc.PutTargets(puttargetparams)
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func createEventARN(lambdaInst *lambda.FunctionConfiguration) string {
+	eventArn := strings.Replace(aws.StringValue(lambdaInst.FunctionArn), "lambda", "events", 1)
+	return strings.Replace(eventArn, "function:", "rule/", 1)
+}
+
+func cleanName(toClean string) string {
+	r, _ := regexp.Compile("[^A-Za-z0-9]+")
+	return r.ReplaceAllString(toClean, "")
 }

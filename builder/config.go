@@ -18,7 +18,6 @@ type Config struct {
 	Runtime        *string
 	RoleType       *string
 	HTTPMethod     *string
-	Schedule       *string
 	RoleFilename   *string
 	NoGateway      *bool
 }
