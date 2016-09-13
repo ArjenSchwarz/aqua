@@ -46,10 +46,11 @@ You can only choose from the following types:
 * Basic (Basic Lambda execution)
 * S3 (S3 support)
 * Aqua (Everything required for running Aqua)
-
-If you require a different role, please create it manually.
+* custom (Define your own role)
 
 Example: aqua role create --name basic_execution_role --type basic
+
+Example: aqua role create --name my_custom_role --type custom --filename ./role.json
 `,
 	Run: createRole,
 }
