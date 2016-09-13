@@ -176,22 +176,12 @@ func downloadFile(rawURL string) (*string, error) {
 func CreateSchedule(settings *Config, schedule string) error {
 	svc := lambdaSession(settings)
 
+	// Check that function exists
 	searchParams := &lambda.GetFunctionConfigurationInput{
 		FunctionName: settings.FunctionName,
 	}
-	lambdaInst, err := svc.GetFunctionConfiguration(searchParams)
 
-	if err != nil {
-		return err
-	}
-	params := &lambda.AddPermissionInput{
-		Action:       aws.String("lambda:InvokeFunction"),
-		FunctionName: settings.FunctionName,
-		Principal:    aws.String("events.amazonaws.com"),
-		StatementId:  aws.String(fmt.Sprintf("scheduler-%s", *settings.FunctionName)),
-		SourceArn:    aws.String(createEventARN(lambdaInst)),
-	}
-	_, err = svc.AddPermission(params)
+	lambdaInst, err := svc.GetFunctionConfiguration(searchParams)
 	if err != nil {
 		return err
 	}
@@ -204,7 +194,20 @@ func CreateSchedule(settings *Config, schedule string) error {
 		Name:               aws.String(cleanedName),
 		ScheduleExpression: aws.String(schedule),
 	}
-	_, err = eventssvc.PutRule(putruleparams)
+
+	ruleOutput, err := eventssvc.PutRule(putruleparams)
+	if err != nil {
+		return err
+	}
+
+	params := &lambda.AddPermissionInput{
+		Action:       aws.String("lambda:InvokeFunction"),
+		FunctionName: settings.FunctionName,
+		Principal:    aws.String("events.amazonaws.com"),
+		StatementId:  aws.String(fmt.Sprintf("scheduler-%s", *settings.FunctionName)),
+		SourceArn:    ruleOutput.RuleArn,
+	}
+	_, err = svc.AddPermission(params)
 	if err != nil {
 		return err
 	}
