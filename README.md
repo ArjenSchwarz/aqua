@@ -28,6 +28,7 @@ Available Commands:
   apikey      List and create API keys
   install     Install Aqua as a Lambda function
   role        Display or create IAM roles
+  schedule    Create a Lambda function schedule
 
 Flags:
   -k, --apikey                  Endpoint can only be accessed with an API key
@@ -35,6 +36,7 @@ Flags:
   -f, --file string             The zip file for your Lambda function, either locally or http(s). The file will first be downloaded locally.
       --json                    Set to true to print output in JSON format
   -n, --name string             The name of the Lambda function
+      --nogateway               Disable the creation of a Gateway. Only create the Lambda function.
       --region string           The region for the lambda function and API Gateway (default "us-east-1")
   -r, --role string             The name of the IAM Role
       --runtime string          The runtime of the Lambda function. (default "nodejs4.3")
@@ -64,9 +66,21 @@ $ aqua --name newFunction --role roleName --file path/to/file.zip
 $ aqua --name newFunction --role roleName --file https://web/address/of/file.zip
 ```
 
+## Set a schedule for a function
+
+Aside from creating gateways, it is also possible to instead set a schedule for a Lambda function.
+
+```bash
+$ aqua schedule --name existingFunction --schedule "rate(10 minutes)"
+```
+
+There is no validity check on these schedules, instead they will be passed to Cloudwatch which will determine if they're valid or not. If you're not familiar with the schedule options for Lambda functions using Cloudwatch, please read the [documentation][lambdaschedules].
+
+[lambdaschedules]: http://docs.aws.amazon.com/lambda/latest/dg/tutorial-scheduled-events-schedule-expressions.html
+
 ## As Lambda function
 
-If installed as a Lambda function, Aqua is capable only of adding a Gateway to a function or creating a Lambda function with sample code. You cannot give it code to install.
+If installed as a Lambda function, Aqua is capable only of adding a Gateway to a function or creating a Lambda function with sample code with a gateway. You cannot give it code to install.
 
 You will have to post the values, where the form fields have the same name as the flags when running it from the command line.
 
