@@ -1,5 +1,9 @@
 Aqua is a tool for quickly creating API Gateways for your AWS Lambda functions, that can run as a Lambda function.
 
+THIS PROJECT IS ABANDONED! Please see the fork by [pedroalvesbatista](https://github.com/pedroalvesbatista/aqua) for any future improvements.
+
+As I no longer use this, I have stopped developing it. pedroalvesbatista has ideas about where the project can go and his fork is now the main source of the project.
+
 # What does it do?
 
 Aqua helps you to quickly create a hassle-free API Gateway for a Lambda function. What it creates is a very simple Gateway, that listens to POST requests and passes the form parameters on to the Lambda function. For what I need this is generally enough, and you can always change it afterwards to suit your needs better.
